@@ -1,0 +1,293 @@
+def identify_structure(G):
+    global status
+    
+    if find_largest_Hn_or_H2(G):
+        largest_Hn_or_H2 = find_largest_Hn_or_H2(G)
+        print("\nH_n identificado!")
+        G.delete_vertices(largest_Hn_or_H2.vertices())
+        #largest_Hn_or_H2.show()
+        #print("\nEtapa concluída, vamos remover esses vértices e rodar o algoritmo para:")
+        if check_vazio(G):
+            return True
+        #G.show()
+        deg = G.degree_sequence()
+        deg = [0] + deg
+        s = deg
+        #print("\nA sequência de graus do grafo é:", s[1:])
+        n = np.size(s) - 1
+        status = 1
+        #print("\n")
+        return canonical(G, s, n)
+        
+    elif find_largest_complement_of_Hn(G):
+        largest_complement_of_Hn = find_largest_complement_of_Hn(G)
+        print("\nComplemento de H_n identificado!")
+        G.delete_vertices(largest_complement_of_Hn.vertices())
+        #largest_complement_of_Hn.show()
+        #print("\nEtapa concluída, vamos remover esses vértices e rodar o algoritmo para:")
+        if check_vazio(G):
+            return True
+        #G.show()
+        deg = G.degree_sequence()
+        deg = [0] + deg
+        s = deg
+        #print("\nA sequência de graus do grafo é:", s[1:])
+        n = np.size(s) - 1
+        status = 1
+        #print("\n")
+        return canonical(G, s, n)
+    
+    elif is_C5(G):
+        print("\nC5 identificado!")
+        #G.show()
+        #print("\nO grafo é matrogêico!\n")
+        status = 0
+        return True
+    
+    elif is_tK2(G):
+        print("\n tK2 identificado!")
+        #G.show()
+        #print("\nO grafo é matrogêico!\n")
+        status = 0
+        return True
+        
+    elif is_complement_of_tK2(G):
+        print("\n CP(2t) identificado!")
+        #G.show()
+        #print("\nO grafo é matrogêico!\n")
+        status = 0
+        return True
+    status=0
+    return False
+
+############################################# IDENTIFICA H2 ou Hn ###################################################
+            
+def is_H2(G):
+    # Verificar se o grafo tem exatamente 4 vértices
+    if G.num_verts() != 4:
+        return False
+
+    # Verificar se o grafo tem exatamente 3 arestas
+    if G.num_edges() != 3:
+        return False
+
+    # Verificar se o grafo é um caminho de 4 vértices (P4)
+    vertices = G.vertices()
+    for perm in Permutations(vertices):
+        # Checar se é um caminho
+        if (G.has_edge(perm[0], perm[1]) and 
+            G.has_edge(perm[1], perm[2]) and 
+            G.has_edge(perm[2], perm[3]) and 
+            not G.has_edge(perm[0], perm[2]) and 
+            not G.has_edge(perm[1], perm[3]) and 
+            not G.has_edge(perm[0], perm[3])):
+            # Verificar se os vértices nas extremidades (perm[0] e perm[3]) têm grau 1
+            if G.degree(perm[0]) == 1 and G.degree(perm[3]) == 1:
+                return True
+
+    return False
+
+def is_Hn(G):
+    num_vertices = G.num_verts()
+    
+    # Verificar se o grafo tem um número par de vértices
+    if num_vertices % 2 != 0 or num_vertices < 6:  # Exclui H2 aqui
+        return False
+    
+    n = num_vertices // 2
+    
+    # Verificar se o grafo tem o número correto de arestas
+    num_expected_edges = ((n * (n - 1)) // 2) + n
+    if G.num_edges() != num_expected_edges:
+        return False
+    
+    # Encontrar uma clique de tamanho n
+    clique = None
+    for subset in Subsets(G.vertices(), n):
+        subgraph = G.subgraph(subset)
+        if subgraph.is_clique():
+            clique = subset
+            break
+    
+    if clique is None:
+        return False
+    
+    # Verificar se os vértices restantes formam um conjunto estável
+    stable_set = set(G.vertices()) - set(clique)
+    if len(stable_set) != n:
+        return False
+    
+    # Verificar se cada vértice do conjunto estável está conectado a exatamente um vértice da clique
+    clique_neighbors = set()
+    for v in stable_set:
+        if G.degree(v) != 1:
+            return False
+        neighbor = G.neighbors(v)[0]
+        if neighbor not in clique or neighbor in clique_neighbors:
+            return False
+        clique_neighbors.add(neighbor)
+    
+    return True
+
+def find_largest_Hn_or_H2(G):
+    max_size = 0
+    largest_Hn_or_H2 = None
+    
+    # Iterar por todos os subconjuntos dos vértices de G
+    for subset in Subsets(G.vertices()):
+        subgraph = G.subgraph(subset)
+        if is_Hn(subgraph) or is_H2(subgraph):
+            # Verificar se os vértices do conjunto estável têm grau 1 no grafo original
+            stable_set = [v for v in subset if subgraph.degree(v) == 1]
+            clique = set(subgraph.vertices()) - set(stable_set)
+            
+            stable_set_valid = all(G.degree(v) == 1 for v in stable_set)
+            clique_valid = all(G.degree(v) == G.order()-subgraph.order()+len(clique) for v in clique)
+            
+            if stable_set_valid and clique_valid:
+                subgraph_size = subgraph.num_verts()
+                if subgraph_size > max_size:
+                    max_size = subgraph_size
+                    largest_Hn_or_H2 = subgraph
+    return largest_Hn_or_H2
+
+########################### Identifica Complementar de Hn ####################
+
+def is_complement_of_Hn(G):
+    num_vertices = G.num_verts()
+    
+    # Verificar se o grafo tem um número par de vértices e pelo menos 6 vértices
+    if num_vertices % 2 != 0 or num_vertices < 6:
+        return False
+    
+    n = num_vertices // 2
+    
+    # Calcular o número esperado de arestas no complemento de H_n
+    num_edges_in_complete_graph = (num_vertices * (num_vertices - 1)) // 2
+    num_edges_in_Hn = ((n * (n - 1)) // 2) + n
+    num_expected_edges = num_edges_in_complete_graph - num_edges_in_Hn
+    if G.num_edges() != num_expected_edges:
+        return False
+    
+    # Encontrar uma clique de tamanho n onde o conjunto restante forma um conjunto estável
+    clique = None
+    for subset in Subsets(G.vertices(), n):
+        subgraph = G.subgraph(subset)
+        if subgraph.is_clique():
+            remaining_vertices = set(G.vertices()) - set(subset)
+            
+            # Verificar se há exatamente n vértices restantes
+            if len(remaining_vertices) != n:
+                continue
+
+            remaining_subgraph = G.subgraph(remaining_vertices)
+            
+            # Verificar se o conjunto restante é um conjunto estável
+            if not remaining_subgraph.is_independent_set():
+                continue
+            
+            # Verificar se cada vértice do conjunto estável está conectado a exatamente (n-1) vértices na clique
+            stable_set_valid = True
+            for v in remaining_vertices:
+                neighbors = G.neighbors(v)
+                if len(neighbors) != (n - 1) or not all(neighbor in subset for neighbor in neighbors):
+                    stable_set_valid = False
+                    break
+            
+            if stable_set_valid:
+                clique = subset
+                break
+    
+    if clique is None:
+        return False
+    
+    # Verificar se cada vértice da clique está conectado a exatamente (2n-2) vértices no grafo original
+    for v in clique:
+        neighbors = G.neighbors(v)
+        if len(neighbors) != (2 * n - 2):
+            return False
+    
+    return True
+
+def find_largest_complement_of_Hn(G):
+    max_size = 0
+    largest_complement_Hn = None
+    
+    # Iterar por todos os subconjuntos dos vértices de G
+    for subset in Subsets(G.vertices()):
+        subgraph = G.subgraph(subset)
+        if is_complement_of_Hn(subgraph):
+            # Verificar as condições adicionais no grafo original
+            clique = [v for v in subgraph.vertices() if subgraph.degree(v) == (2 * (len(subgraph) // 2) - 2)]
+            stable_set = set(subgraph.vertices()) - set(clique)
+            
+            clique_valid = all(G.degree(v) == G.order()-subgraph.order()+len(clique)+len(stable_set)-2 for v in clique)
+            stable_set_valid = all(G.degree(v) == (len(clique) - 1) for v in stable_set)
+            
+            if clique_valid and stable_set_valid:
+                subgraph_size = subgraph.num_verts()
+                if subgraph_size > max_size:
+                    max_size = subgraph_size
+                    largest_complement_Hn = subgraph
+    
+    return largest_complement_Hn
+
+######################################## Identifica C5 #####################################
+
+def is_C5(G):
+    # Verificar se o grafo tem 5 vértices e é conexo
+    if G.order() != 5 or not G.is_connected():
+        return False
+    
+    # Verificar se cada vértice tem grau 2
+    for v in G.vertices():
+        if G.degree(v) != 2:
+            return False
+    return True
+
+######################################## Identifica tK2 ####################################
+
+def is_tK2(G):
+    # Número total de vértices
+    num_vertices = G.num_verts()
+    
+    # Número total de arestas
+    num_arestas = G.num_edges()
+    
+    # Verificar o número total de vértices e arestas
+    if num_arestas != num_vertices / 2:
+        return False
+    
+    # Verificar se cada vértice tem grau 1
+    for v in G.vertices():
+        if G.degree(v) != 1:
+            return False
+    
+    return True
+
+######################################## Identifica CP(2t) #################################
+
+def is_complement_of_tK2(G):
+    # Verificar se o número total de vértices é par
+    if G.num_verts() % 2 != 0:
+        return False
+    
+    # Calcular o número total de vértices
+    num_vertices = G.num_verts()
+    
+    # Calcular o número total de arestas em tK2
+    num_arestas_tK2 = G.num_verts() // 2
+    
+    # Calcular o número total de arestas esperadas no complemento de tK2
+    num_arestas_esperadas = num_vertices * (num_vertices - 1) // 2 - num_arestas_tK2
+    
+    # Verificar se o número total de arestas é igual ao complemento de tK2
+    if G.num_edges() != num_arestas_esperadas:
+        return False
+    
+    # Verificar se o grau de cada vértice é n - 2, onde n é o número total de vértices
+    for v in G.vertices():
+        if G.degree(v) != num_vertices - 2:
+            return False
+    
+    return True
