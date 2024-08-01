@@ -1,0 +1,184 @@
+import sys
+import numpy as np
+
+first_time_messages = {
+    'indec': False
+}
+
+status = 1
+
+def remove_um_vertice_isolado(grafo):
+    vertices_isolados = [v for v in grafo.vertices() if grafo.degree(v) == 0]
+    if vertices_isolados:
+        grafo.delete_vertex(vertices_isolados[0])
+    return grafo
+
+def check_vazio(G):
+    global status
+    if G.order() == 0 and G.size() == 0:
+        #print("\nO grafo é vazio.")
+        #print("\nO grafo é matrogênico!")
+        status = 0
+        return True
+
+def canonical(G, s, n):
+    global status
+    
+    if check_vazio(G):
+        return True
+    
+    if status == 1:
+        s1 = 0
+        k1 = 0
+        j = n
+        k2 = n + 1
+        #print(f"Começando... k1 = {k1}, k2 = {k2}, j = {j}\n")
+
+        if s[1] == n - 1:
+            k1 = 1
+            if status == 1:
+                if M4(s1, k1, j, k2, s, n, G):
+                    return True
+                else:
+                    return False
+
+        if s[j] == 0:
+            if status == 1:
+                if M3(s1, k1, j, k2, s, n, G):
+                    return True
+                else:
+                    return False
+
+        if status == 1:
+            if M1(s1, k1, j, k2, s, n, G):
+                return True
+            else:
+                return False
+        else:
+            #print("Parou...")
+            return False
+
+def M1(s1, k1, j, k2, s, n, G):
+    global status
+    
+    #print("entrado em M1...")
+    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
+    s1 = s1 + s[j]
+    if s[j] == s[j-1]:
+        if status == 1:
+            if M5(s1, k1, j, k2, s, n, G):
+                return True
+            else:
+                return False
+
+    a = s1
+    for i in range(1,j):
+        a = a + j - 2 - s[i]
+        if s[i] == s[i+1]:
+            if status == 1:
+                if M2(s1, k1, j, k2, s, n, G):
+                    return True
+                else:
+                    return False
+        if a == 0:
+            k1 = i
+            if status == 1:
+                if M3(s1, k1, j, k2, s, n, G):
+                    return True
+                else:
+                    return False
+    if status == 1:
+        if M2(s1, k1, j, k2, s, n, G):
+            return True
+        else:
+            return False
+
+def M2(s1, k1, j, k2, s, n, G):
+    global status
+    
+    #print("entrado em M2...")
+    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
+    if status == 1:
+        if M5(s1, k1, j, k2, s, n, G):
+            return True
+        else:
+            return False
+
+def M5(s1, k1, j, k2, s, n, G):
+    global status
+    
+    #print("entrado em M5...")
+    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
+    j = j - 1
+    if j == 1:
+        if status == 1:
+            if M4(s1, k1, j, k2, s, n, G):
+                return True
+            else:
+                return False
+    if status == 1:
+        if M1(s1, k1, j, k2, s, n, G):
+            return True
+        else:
+            return False
+
+def M3(s1, k1, j, k2, s, n, G):
+    global status
+    
+    #print("entrado em M3...")
+    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
+    k2 = j
+    if status == 1:
+        if M4(s1, k1, j, k2, s, n, G):
+            return True
+        else:
+            return False
+
+def M4(s1, k1, j, k2, s, n, G):
+    global first_time_messages
+    global status
+    
+    #print("entrado em M4...")
+    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}")
+    
+    if k1 == 0 and k2 == n + 1:
+        if not first_time_messages['indec']:
+            #print("\nO grafo é indecomponível (e a decomposição canônica acaba aqui)")
+            #print("\nO resto é para verificar se o grafo é matrogênico!")
+            first_time_messages['indec'] = True
+        if identify_structure(G):
+            return True
+        else:
+            return False
+
+    if k1 == 0:
+        print("\nO1 identificado!")
+        #print("\nEtapa concluída, agora vamos rodar o algoritmo com a seguinte sequência:")
+        G = remove_um_vertice_isolado(G)
+        if check_vazio(G):
+            return True
+        #G.show()
+        deg = G.degree_sequence()
+        s = [0] + deg
+        #print("\nA sequência de graus do grafo é:", s[1:])
+        n = np.size(s) - 1
+        status = 1
+        #print("\n")
+        return canonical(G, s, n)
+        
+    if k2 == n + 1:
+        print("\nK1 identificado!")
+        #print("\nEtapa concluída, vamos remover o vértice e rodar o algoritmo para:")
+        degrees = {v: G.degree(v) for v in G.vertices()}
+        vertice_maior_grau = max(degrees, key=degrees.get)
+        G.delete_vertex(vertice_maior_grau)
+        if check_vazio(G):
+            return True
+        #G.show()
+        deg = G.degree_sequence()
+        s = [0] + deg
+        #print("\nA sequência de graus do grafo é:", s[1:])
+        n = np.size(s) - 1
+        status = 1
+        #print("\n")
+        return canonical(G, s, n)
