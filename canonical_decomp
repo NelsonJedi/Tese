@@ -1,184 +1,160 @@
-import sys
-import numpy as np
+import numpy as np # Necessary library
 
-first_time_messages = {
-    'indec': False
-}
+# Construct a canonical decomposition of the Graph G
+def canonical_decomp(d, n): 
+    
+    for i in range(n): # Construct the vector m(d)
+        if (d[i]>=i):
+            m = i + 1
+    print("m(d) =", m)
 
-status = 1
+    M = np.zeros((n, n)) # Construct the matrix M(d)
+    todos_indices = np.arange(n)
+    for i in range(n):
+        num_uns = d[i]
+        if num_uns > 0:
+            candidatos = np.delete(todos_indices, i)
+            num_uns = min(num_uns, len(candidatos))
+            M[i, candidatos[:num_uns]] = 1
 
-def remove_um_vertice_isolado(grafo):
-    vertices_isolados = [v for v in grafo.vertices() if grafo.degree(v) == 0]
-    if vertices_isolados:
-        grafo.delete_vertex(vertices_isolados[0])
-    return grafo
+    print("M(d) =")
+    print(M)
 
-def check_vazio(G):
+    s = np.sum(M, axis=0) # Construct the vector s(d)
+    print("s(d) =", s)
+
+    # Check if the graph is a O_n
+    if np.array_equal(d, np.zeros_like(d)):
+        on = n
+        d_A = []
+        d_B = d
+        print("\nd_A =", d_A)
+        print("d_B =", d_B)
+        return []
+
+    # Check if the graph is a K_n
+    if np.array_equal(d, (n-1)*np.ones_like(d)):
+        kn = n
+        d_A = d
+        d_B = []
+        print("\nd_A =", d_A)
+        print("d_B =", d_B)
+        return []
+
+    t_encontrado = [] # Find the possible values for t
+    for t in range(1, m + 1):
+        if sum(d[:t]) == sum(s[:t]):
+            t_encontrado.append(t)
+    print("\nPossible t's =", t_encontrado)
+
+    # If we can't find a value for t, then the graph is indecomposable
+    if t_encontrado == []:
+        print("\nThe graph is indecomposable!")
+        return []
+
+    it=0
+    while it <= (len(t_encontrado)-1):
+        print(f"\nFor t={t_encontrado[it]}, we have:")
+        l_encontrado = 0 # Find the value for l(t)
+        for l in range(n):
+            if d[l]<t_encontrado[it]:
+                l_encontrado = l+1
+                break
+
+        # If l(t)>t+1, then the Graph is decomposable
+        if(l_encontrado > t_encontrado[it] + 1):
+            print("l(t) =", l_encontrado)
+            d_A = np.zeros(t_encontrado[it])
+            d_B = np.zeros(n-l_encontrado+1)
+            d_C = np.zeros(l_encontrado-1 - (t_encontrado[it]+1) +1)
+            d_A, d_B, d_C = parts(d, d_A, d_B, d_C, n, 
+                                  t, t_encontrado[it], l, l_encontrado)
+            return d_C
+            
+        # If l(t)=t+1, then the Graph is decomposable and its split
+        elif(l_encontrado == t_encontrado[it] + 1):
+            print(f"l(t) = {l_encontrado} (l=t+1)")
+            print("\nSplit Graph!")
+            d_A = np.zeros(t_encontrado[it])
+            d_B = np.zeros(n-t_encontrado[it])
+
+            for k in range(t_encontrado[it]):
+                d_A[k]=d[k]
+
+            aux = 0
+            for k in range(t_encontrado[it], n):
+                d_B[aux] = d[k]
+                aux = aux + 1
+
+            print("\nd_A = ", d_A)
+            print("d_B = ", d_B)
+            return []
+
+        # If l(t)=0, then the Graph is decomposable and d_B is empty
+        elif(l_encontrado == 0): 
+            print("There is no l! (d_B is empty)\n")
+            
+            d_A = np.zeros(t_encontrado[it])
+            d_B = []
+            d_C = np.zeros(n-t_encontrado[it])
+            
+            for k in range(t_encontrado[it]):
+                d_A[k]=0
+                
+            aux = 0
+            for k in range(t_encontrado[it], n):
+                d_C[aux] = d[k] - t_encontrado[it]
+                aux = aux + 1
+                
+            print("\nd_A = ", d_A)
+            print("d_B = ", d_B)
+            print("d_C = ", d_C)
+            print("\n")
+            
+            return d_C
+
+        # If l(t)<t+1, check for the next value of t
+        elif(l_encontrado < t_encontrado[it] + 1):
+            print(" l<t+1! \n")
+            it = it + 1
+            
+            
+    print("The Graph is indecomposable!")
+    return []
+
+######################################################################
+
+# Construct the sequences d_A, d_B and d_C
+def parts(d, d_A, d_B, d_C, n, t, t_encontrado, l, l_encontrado):
     global status
-    if G.order() == 0 and G.size() == 0:
-        #print("\nO grafo é vazio.")
-        #print("\nO grafo é matrogênico!")
-        status = 0
-        return True
-
-def canonical(G, s, n):
-    global status
-    
-    if check_vazio(G):
-        return True
-    
-    if status == 1:
-        s1 = 0
-        k1 = 0
-        j = n
-        k2 = n + 1
-        #print(f"Começando... k1 = {k1}, k2 = {k2}, j = {j}\n")
-
-        if s[1] == n - 1:
-            k1 = 1
-            if status == 1:
-                if M4(s1, k1, j, k2, s, n, G):
-                    return True
-                else:
-                    return False
-
-        if s[j] == 0:
-            if status == 1:
-                if M3(s1, k1, j, k2, s, n, G):
-                    return True
-                else:
-                    return False
-
-        if status == 1:
-            if M1(s1, k1, j, k2, s, n, G):
-                return True
-            else:
-                return False
-        else:
-            #print("Parou...")
-            return False
-
-def M1(s1, k1, j, k2, s, n, G):
-    global status
-    
-    #print("entrado em M1...")
-    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
-    s1 = s1 + s[j]
-    if s[j] == s[j-1]:
-        if status == 1:
-            if M5(s1, k1, j, k2, s, n, G):
-                return True
-            else:
-                return False
-
-    a = s1
-    for i in range(1,j):
-        a = a + j - 2 - s[i]
-        if s[i] == s[i+1]:
-            if status == 1:
-                if M2(s1, k1, j, k2, s, n, G):
-                    return True
-                else:
-                    return False
-        if a == 0:
-            k1 = i
-            if status == 1:
-                if M3(s1, k1, j, k2, s, n, G):
-                    return True
-                else:
-                    return False
-    if status == 1:
-        if M2(s1, k1, j, k2, s, n, G):
-            return True
-        else:
-            return False
-
-def M2(s1, k1, j, k2, s, n, G):
-    global status
-    
-    #print("entrado em M2...")
-    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
-    if status == 1:
-        if M5(s1, k1, j, k2, s, n, G):
-            return True
-        else:
-            return False
-
-def M5(s1, k1, j, k2, s, n, G):
-    global status
-    
-    #print("entrado em M5...")
-    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
-    j = j - 1
-    if j == 1:
-        if status == 1:
-            if M4(s1, k1, j, k2, s, n, G):
-                return True
-            else:
-                return False
-    if status == 1:
-        if M1(s1, k1, j, k2, s, n, G):
-            return True
-        else:
-            return False
-
-def M3(s1, k1, j, k2, s, n, G):
-    global status
-    
-    #print("entrado em M3...")
-    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}\n")
-    k2 = j
-    if status == 1:
-        if M4(s1, k1, j, k2, s, n, G):
-            return True
-        else:
-            return False
-
-def M4(s1, k1, j, k2, s, n, G):
-    global first_time_messages
-    global status
-    
-    #print("entrado em M4...")
-    #print(f"até aqui... k1 = {k1}, k2 = {k2}, j = {j}")
-    
-    if k1 == 0 and k2 == n + 1:
-        if not first_time_messages['indec']:
-            #print("\nO grafo é indecomponível (e a decomposição canônica acaba aqui)")
-            #print("\nO resto é para verificar se o grafo é matrogênico!")
-            first_time_messages['indec'] = True
-        if identify_structure(G):
-            return True
-        else:
-            return False
-
-    if k1 == 0:
-        print("\nO1 identificado!")
-        #print("\nEtapa concluída, agora vamos rodar o algoritmo com a seguinte sequência:")
-        G = remove_um_vertice_isolado(G)
-        if check_vazio(G):
-            return True
-        #G.show()
-        deg = G.degree_sequence()
-        s = [0] + deg
-        #print("\nA sequência de graus do grafo é:", s[1:])
-        n = np.size(s) - 1
-        status = 1
-        #print("\n")
-        return canonical(G, s, n)
+    for k in range(t_encontrado): # Construct d_A
+        d_A[k] = d[k] - l_encontrado + t_encontrado + 1
         
-    if k2 == n + 1:
-        print("\nK1 identificado!")
-        #print("\nEtapa concluída, vamos remover o vértice e rodar o algoritmo para:")
-        degrees = {v: G.degree(v) for v in G.vertices()}
-        vertice_maior_grau = max(degrees, key=degrees.get)
-        G.delete_vertex(vertice_maior_grau)
-        if check_vazio(G):
-            return True
-        #G.show()
-        deg = G.degree_sequence()
-        s = [0] + deg
-        #print("\nA sequência de graus do grafo é:", s[1:])
-        n = np.size(s) - 1
-        status = 1
-        #print("\n")
-        return canonical(G, s, n)
+    aux = 0
+    for k in range(l_encontrado-1, n): # Construct d_B
+        d_B[aux] = d[k]
+        aux = aux + 1
+
+    aux = 0
+    for k in range(t_encontrado+1, l_encontrado):# Construct d_C
+        d_C[aux] = d[k-1] - t_encontrado
+        aux = aux + 1
+    
+    print("\nd_A = ", d_A)
+    print("d_B = ", d_B)
+    print("d_C = ", d_C)
+    print("\n")
+    
+    return d_A, d_B, d_C
+
+######################################################################
+
+
+G = Graph({0:[1,2,3,4], 1:[2,3,4], 2:[3,4], 3:[4,5], 4:[6]}) # Graph G
+G.show()
+d = G.degree_sequence() # Degree sequence of G
+while len(d) != 0:
+    print("\nd =", d)
+    n = len(d)
+    d = np.array(d, dtype=int)
+    d = canonical_decomp(d, n) # Canonical Decomposition of d
