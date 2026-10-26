@@ -1,0 +1,83 @@
+from itertools import accumulate
+from operator import index
+
+
+def _validate(degrees):
+    try:
+        d = sorted((index(x) for x in degrees), reverse=True)
+    except TypeError as exc:
+        raise ValueError('Degrees must be integers.') from exc
+    n = len(d)
+    if any(x < 0 or x >= n for x in d):
+        raise ValueError('Each degree must lie between 0 and n - 1.')
+    if sum(d) % 2:
+        raise ValueError('The degree sum must be even.')
+    prefix = [0, *accumulate(d)]
+    for k in range(1, n + 1):
+        if prefix[k] > k * (k - 1) + sum(min(k, x) for x in d[k:]):
+            raise ValueError('The sequence is not graphic.')
+    return d
+
+
+def _first_split(d):
+    n = len(d)
+    prefix = [0, *accumulate(d)]
+    # Search by increasing size of the first component.
+    for size in range(1, n):
+        for m in range(size + 1):
+            ell = size - m
+            cut = n - ell
+            if prefix[m] == m * (cut - 1) + prefix[n] - prefix[cut]:
+                return m, ell
+    return None
+
+
+def canonical_decomp(degrees):
+    """Return the canonical components at the degree-sequence level.
+
+    A split component is {'type': 'split', 'A': [...], 'B': [...]}.
+    A non-split terminal component is {'type': 'non_split', 'degrees': [...]}.
+    Degrees in each returned component are INTERNAL degrees.
+    Input may be unsorted; vertex identities are not retained.
+    Uses the (m, ell) criterion, not the linear-time refinement.
+    Worst-case time O(n**2); auxiliary space O(n).
+    """
+    d = _validate(degrees)
+    components = []
+    while d:
+        n = len(d)
+        split = _first_split(d)
+        if split is None:
+            # Split-graph degree-sequence criterion (including K_1).
+            m = max(i for i, degree in enumerate(d, start=1) if degree >= i - 1)
+            if sum(d[:m]) == m * (m - 1) + sum(d[m:]):
+                components.append({'type': 'split', 'A': d[:m], 'B': d[m:]})
+            else:
+                components.append({'type': 'non_split', 'degrees': d[:]})
+            break
+        m, ell = split
+        cut = n - ell
+        remainder_size = n - m - ell
+        components.append({
+            'type': 'split',
+            'A': [x - remainder_size for x in d[:m]],
+            'B': d[cut:],
+        })
+        d = [x - m for x in d[m:cut]]
+    return components
+
+
+def print_decomposition(components):
+    if not components:
+        print('Empty graph.')
+    for i, component in enumerate(components, start=1):
+        if component['type'] == 'split':
+            print(f"X_{i}: A = {component['A']}, B = {component['B']}")
+        else:
+            print(f"F: degrees = {component['degrees']}")
+
+G = Graph({0: [1, 2, 3, 4], 1: [2, 3, 4], 2: [3, 4], 3: [4, 5], 4: [6]})
+G.show()
+
+components = canonical_decomp(G.degree_sequence())
+print_decomposition(components)
